@@ -8,7 +8,7 @@ app.use(bodyParser.urlencoded({extended: true}));
 app.use(bodyParser.json());
 const ftp = new PromiseFtp();
 
-app.use( async (req,res,next) => {
+app.use(async (req,res,next) => {
 	// Website you wish to allow to connect
 	res.setHeader("Access-Control-Allow-Origin", "*");
     
@@ -24,8 +24,10 @@ app.use( async (req,res,next) => {
 	next();
 });
 
-app.use("/",async (req,res,next) => {
+app.use("/", async (req,res,next) => {
 	let error = {};
+	let messageServer = "";
+	console.log(req.body);
 	const status = ftp.getConnectionStatus();
 	if(status != "connected" && (!req.body.host || !req.body.user || !req.body.password)){
 		error.status = 400;
@@ -38,17 +40,23 @@ app.use("/",async (req,res,next) => {
 	}else{
 		if(ftp.getConnectionStatus() !== "connected"){
 			try{
-				await ftp.connect(req.body);
+				messageServer = await ftp.connect(req.body);
 			}catch(err){
 				error = err;
+				next(error);
 			}
+			req.messageServer = {
+				message:messageServer,
+				rootDir:await ftp.list("/")
+			};
+			res.status = "connected";
+			next();
 		}
 	}
-	res.status = "connected";
-	next();
 });
 
 app.use(["/",/[/]+[:\w\W]*/],async (req,res,next) => {
+	
 	try{
 		const getDirectory = await ftp.list(req.url);
 		req.directory = getDirectory;
@@ -58,16 +66,21 @@ app.use(["/",/[/]+[:\w\W]*/],async (req,res,next) => {
 	next();
 });
 
+app.post("/",(req,res) => {
+	res.send(req.messageServer);
+});
+
 app.get("/", async (req,res) => {
 	res.send(JSON.stringify(req.directory));
 });
 
-app.get(/[/]+[:\w\W]*/,(req,res) => {
+app.get(/[/home]+[:\w\W]*/,(req,res) => {
 	res.send(`${JSON.stringify(req.directory)} matched`);
 });
 
 app.use("/",(err,req,res,next) => {
 	res.send({message:err.message,status:err.code});
+	next();
 });
 
 
