@@ -25,12 +25,11 @@ app.use(async (req,res,next) => {
 });
 
 app.use("/", async (req,res,next) => {
-	let error = {};
+	let error = {message:"",statuss:0};
 	let messageServer = "";
-	console.log(req.body);
 	const status = ftp.getConnectionStatus();
 	if(status != "connected" && (!req.body.host || !req.body.user || !req.body.password)){
-		error.status = 400;
+		error.code = 400;
 		error.message = "Bad Request";
 		next(error);
 	}else if(status != "connected" && req.method !== "POST"){
@@ -47,7 +46,6 @@ app.use("/", async (req,res,next) => {
 			}
 			req.messageServer = {
 				message:messageServer,
-				rootDir:await ftp.list("/")
 			};
 			res.status = "connected";
 			next();
@@ -56,12 +54,14 @@ app.use("/", async (req,res,next) => {
 });
 
 app.use(["/",/[/]+[:\w\W]*/],async (req,res,next) => {
-	
-	try{
-		const getDirectory = await ftp.list(req.url);
-		req.directory = getDirectory;
-	}catch(err){
-		next(err);
+	if(ftp.getConnectionStatus() === "connected"){
+
+		try{
+			const getDirectory = await ftp.list(req.url);
+			req.directory = getDirectory;
+		}catch(err){
+			next(err);
+		}
 	}
 	next();
 });
